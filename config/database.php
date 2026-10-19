@@ -1,5 +1,8 @@
 <?php
 
+require_once __DIR__ . '/env.php';
+loadEnvironmentFile(__DIR__ . '/../.env');
+
 function getDatabaseConnection(): PDO
 {
     $host = getenv('PAYROLL_DB_HOST') ?: '127.0.0.1';

@@ -3,7 +3,7 @@
 1. Start MySQL in the XAMPP Control Panel.
 2. In phpMyAdmin, create a database named `payroll_db`.
 3. Select that database and import `schema.sql`.
-4. The default connection uses `127.0.0.1:3307`, database `payroll_db`, user `root`, and an empty password. Override these with the `PAYROLL_DB_HOST`, `PAYROLL_DB_PORT`, `PAYROLL_DB_NAME`, `PAYROLL_DB_USER`, and `PAYROLL_DB_PASSWORD` environment variables when needed.
+4. The project reads database settings from the root `.env` file. It is initialized with the local defaults `127.0.0.1:3307`, database `payroll_db`, user `root`, and an empty password. Edit `.env` if your local MySQL credentials differ. Keep `.env` private; `.env.example` is safe to share.
 5. From the project root, create the first sign-in account:
 
    ```powershell
