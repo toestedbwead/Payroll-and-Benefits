@@ -21,7 +21,10 @@ $pages = [
 
 $currentPage = $_GET['page'] ?? 'login';
 
-if (!is_string($currentPage) || ($currentPage !== 'logout' && !isset($pages[$currentPage]))) {
+if (
+    !is_string($currentPage)
+    || (!in_array($currentPage, ['logout', 'claim_receipt'], true) && !isset($pages[$currentPage]))
+) {
     http_response_code(404);
     exit('Page not found.');
 }
@@ -57,10 +60,21 @@ if (!isset($_SESSION['user'])) {
     exit;
 }
 
+if ($currentPage === 'claim_receipt') {
+    require_once __DIR__ . '/app/Controllers/ClaimsController.php';
+    ClaimsController::downloadReceipt();
+}
+
 if (!isset($_SESSION['csrf_token'])) {
     $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
 header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
+
+if ($currentPage === 'claims') {
+    require_once __DIR__ . '/app/Controllers/ClaimsController.php';
+    $claimsPageData = ClaimsController::handleRequest();
+}
+
 require $pages[$currentPage];
