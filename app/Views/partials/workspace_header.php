@@ -3,8 +3,24 @@ $currentUser = $_SESSION['user'] ?? [];
 $userName = isset($currentUser['name']) && is_string($currentUser['name']) ? $currentUser['name'] : 'User';
 $userEmail = isset($currentUser['email']) && is_string($currentUser['email']) ? $currentUser['email'] : '';
 $userInitials = strtoupper(substr($userName, 0, 2));
+$canManageHmo = isset($currentUser['role'])
+    && is_string($currentUser['role'])
+    && in_array($currentUser['role'], ['admin', 'superadmin', 'hr_manager'], true);
+$settingsSectionByPage = [
+    'payroll' => 'payroll',
+    'compensation' => 'compensation',
+    'claims' => 'claims',
+    'benefits' => 'benefits',
+];
+$headerSettingsSection = isset($currentPage) && is_string($currentPage)
+    ? ($settingsSectionByPage[$currentPage] ?? 'organization')
+    : 'organization';
 ?>
-<header class="sticky top-0 z-20 flex h-16 shrink-0 items-center justify-end border-b border-gray-200 bg-white px-5 sm:px-8">
+<header class="sticky top-0 z-20 flex h-16 shrink-0 items-center justify-between border-b border-gray-200 bg-white px-5 sm:px-8">
+    <a href="index.php?page=dashboard" class="flex min-w-0 items-center gap-3" aria-label="Payroll & Benefits home">
+        <img src="public/assets/priority-handling-mark.png" alt="" class="h-10 w-10 shrink-0 object-contain">
+        <span class="hidden text-sm font-semibold text-gray-900 sm:inline">Payroll &amp; Benefits</span>
+    </a>
     <div class="flex items-center gap-3">
         <div class="relative">
             <button id="notificationButton" type="button" aria-label="Notifications" aria-expanded="false" aria-controls="notificationMenu" class="flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -15,6 +31,12 @@ $userInitials = strtoupper(substr($userName, 0, 2));
                 <p class="mt-2 text-sm text-gray-500">You’re all caught up.</p>
             </div>
         </div>
+
+        <?php if ($canManageHmo && ($currentPage ?? '') !== 'settings'): ?>
+            <a href="index.php?page=settings&amp;section=<?= rawurlencode($headerSettingsSection) ?>&amp;return_to=<?= rawurlencode(isset($currentPage) && is_string($currentPage) ? $currentPage : 'dashboard') ?>" aria-label="Settings" title="Settings" class="flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <i class="bi bi-gear text-xl" aria-hidden="true"></i>
+            </a>
+        <?php endif; ?>
 
         <div class="relative">
             <button id="profileButton" type="button" aria-label="Open account menu" aria-expanded="false" aria-controls="profileMenu" class="flex items-center gap-3 rounded-full p-1 pr-2 text-left transition-colors hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500">

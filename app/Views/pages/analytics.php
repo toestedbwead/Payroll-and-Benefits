@@ -10,15 +10,17 @@ preventDirectViewAccess(__FILE__);
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 font-sans antialiased">
-    <div class="flex h-screen overflow-hidden">
-        <?php require __DIR__ . '/../partials/sidebar.php'; ?>
-        <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
-            <?php require __DIR__ . '/../partials/workspace_header.php'; ?>
+    <div class="flex h-screen flex-col overflow-hidden">
+        <?php require __DIR__ . '/../partials/workspace_header.php'; ?>
+        <div class="flex min-h-0 flex-1 overflow-hidden">
+            <?php require __DIR__ . '/../partials/sidebar.php'; ?>
+            <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
             <div class="flex-1 overflow-y-auto p-8">
                 <h2 class="text-2xl font-bold text-gray-900">HR Analytics</h2>
                 <p class="text-sm text-gray-500 mt-1">View workforce insights, payroll distribution trends, and budgeting reports.</p>
             </div>
-        </main>
+            </main>
+        </div>
     </div>
     <?php require __DIR__ . '/../partials/workspace_scripts.php'; ?>
 </body>

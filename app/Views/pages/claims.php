@@ -18,32 +18,7 @@ $statusClasses = [
     'Rejected' => 'bg-rose-50 text-rose-700 ring-rose-600/20',
     'Returned for Revision' => 'bg-indigo-50 text-indigo-700 ring-indigo-600/20',
 ];
-$expenseThresholds = [
-    'Medical' => [
-        'label' => 'Medical / Health',
-        'amount' => 5000,
-        'days' => 60,
-        'icon' => 'bi-heart-pulse',
-    ],
-    'Transportation' => [
-        'label' => 'Transportation',
-        'amount' => 1000,
-        'days' => 30,
-        'icon' => 'bi-train-front',
-    ],
-    'Official Business' => [
-        'label' => 'Official Business',
-        'amount' => 10000,
-        'days' => 60,
-        'icon' => 'bi-briefcase',
-    ],
-    'Miscellaneous' => [
-        'label' => 'Miscellaneous',
-        'amount' => 500,
-        'days' => 30,
-        'icon' => 'bi-receipt',
-    ],
-];
+$expenseThresholds = is_array($claimsThresholds ?? null) ? $claimsThresholds : [];
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -55,10 +30,11 @@ $expenseThresholds = [
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-gray-100 font-sans antialiased">
-    <div class="flex h-screen overflow-hidden">
-        <?php require __DIR__ . '/../partials/sidebar.php'; ?>
-        <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
-            <?php require __DIR__ . '/../partials/workspace_header.php'; ?>
+    <div class="flex h-screen flex-col overflow-hidden">
+        <?php require __DIR__ . '/../partials/workspace_header.php'; ?>
+        <div class="flex min-h-0 flex-1 overflow-hidden">
+            <?php require __DIR__ . '/../partials/sidebar.php'; ?>
+            <main class="flex min-w-0 flex-1 flex-col overflow-hidden">
             <div class="flex-1 space-y-6 overflow-y-auto p-5 sm:p-8">
                 <div class="flex flex-wrap items-start justify-between gap-4">
                     <div>
@@ -150,8 +126,8 @@ $expenseThresholds = [
                                         <th scope="col" class="whitespace-nowrap px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Expense</th>
                                         <th scope="col" class="whitespace-nowrap px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Amount</th>
                                         <th scope="col" class="whitespace-nowrap px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Submitted</th>
-                                        <th scope="col" class="whitespace-nowrap px-5 py-3 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Status</th>
-                                        <th scope="col" class="whitespace-nowrap px-5 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-500">Action</th>
+                                        <th scope="col" class="whitespace-nowrap px-3 py-3 text-[11px] font-semibold uppercase tracking-wide text-gray-500">Status</th>
+                                        <th scope="col" class="whitespace-nowrap px-3 py-3 text-right text-[11px] font-semibold uppercase tracking-wide text-gray-500">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-100 bg-white">
@@ -256,7 +232,6 @@ $expenseThresholds = [
                                             'receiptUrl' => $hasReceipt ? 'index.php?page=claim_receipt&id=' . $claimId : '',
                                             'status' => $status,
                                             'reviewable' => $canReviewClaim,
-                                            'reviewNotes' => trim((string) ($claim['review_notes'] ?? '')),
                                         ];
                                         $claimDetailsJson = json_encode(
                                             $claimDetails,
@@ -277,17 +252,11 @@ $expenseThresholds = [
                                             </td>
                                             <td class="whitespace-nowrap px-5 py-4 text-sm font-semibold text-gray-900">₱<?= number_format((float) $claim['claim_amount'], 2) ?></td>
                                             <td class="whitespace-nowrap px-5 py-4 text-xs text-gray-600"><?= $escape($submittedAt->format('M j, Y')) ?></td>
-                                            <td class="whitespace-nowrap px-5 py-4">
-                                                <span class="inline-flex <?= $status === 'Pending Approval' ? 'rounded-none' : 'rounded-full' ?> px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset <?= $statusClasses[$status] ?? 'bg-gray-100 text-gray-700 ring-gray-500/20' ?>"><?= $escape($status) ?></span>
-                                                <?php if (!empty($claim['review_notes'])): ?>
-                                                    <details class="mt-2 max-w-56">
-                                                        <summary class="cursor-pointer text-xs font-medium text-gray-500 hover:text-gray-800">Review history</summary>
-                                                        <pre class="mt-2 max-h-32 overflow-y-auto overscroll-contain whitespace-pre-wrap break-words rounded-lg bg-gray-50 p-2 text-[11px] leading-5 text-gray-600"><?= $escape((string) $claim['review_notes']) ?></pre>
-                                                    </details>
-                                                <?php endif; ?>
+                                            <td class="max-w-36 px-3 py-3">
+                                                <span class="inline-flex rounded-none px-2.5 py-1.5 text-xs font-semibold <?= $statusClasses[$status] ?? 'bg-gray-100 text-gray-700' ?>"><?= $escape($status) ?></span>
                                             </td>
-                                            <td class="whitespace-nowrap px-5 py-4 text-right">
-                                                <button type="button" data-claim-details="<?= $escape((string) $claimDetailsJson) ?>" aria-label="View <?= $escape($claimNumber) ?>" class="inline-flex items-center gap-2 rounded-lg border border-gray-300 px-3 py-2 text-xs font-semibold text-gray-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700">
+                                            <td class="whitespace-nowrap px-3 py-3 text-right">
+                                                <button type="button" data-claim-details="<?= $escape((string) $claimDetailsJson) ?>" aria-label="View <?= $escape($claimNumber) ?>" class="inline-flex items-center gap-2 rounded-xl border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700 hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
                                                     <i class="bi bi-eye" aria-hidden="true"></i><span>View</span>
                                                 </button>
                                             </td>
@@ -403,7 +372,8 @@ $expenseThresholds = [
                     </section>
                 </section>
             </div>
-        </main>
+            </main>
+        </div>
     </div>
 
     <?php if ($canReview): ?>
@@ -442,10 +412,6 @@ $expenseThresholds = [
                         <div class="mt-4">
                             <h3 class="text-sm font-semibold text-gray-900">Attachment</h3>
                             <div id="reviewReceipt" class="mt-2 text-sm text-gray-500"></div>
-                        </div>
-                        <div id="reviewNotesPanel" class="mt-4">
-                            <h3 class="text-sm font-semibold text-gray-900">Review history</h3>
-                            <pre id="reviewNotes" class="mt-2 whitespace-pre-wrap break-words border border-gray-200 bg-gray-50 p-3 text-xs leading-5 text-gray-600"></pre>
                         </div>
                     </section>
 
@@ -659,7 +625,6 @@ $expenseThresholds = [
                         } else {
                             receiptContainer.textContent = 'No receipt attached.';
                         }
-                        setText('reviewNotes', claim.reviewNotes || 'No review history recorded for this claim.');
                         document.getElementById('claimReviewActions').hidden = !claim.reviewable;
                         document.getElementById('claimFinalState').hidden = claim.reviewable;
                         form.querySelectorAll('[data-review-submit]').forEach((actionButton) => {

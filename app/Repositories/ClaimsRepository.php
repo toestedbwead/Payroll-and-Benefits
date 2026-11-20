@@ -13,10 +13,12 @@ class ClaimsRepository
         $statement = $this->connection->prepare(
             'SELECT c.id, c.employee_id, c.expense_type, c.claim_amount, c.expense_date,
                     c.receipt_attachment, c.status, c.review_notes, c.created_at,
-                    e.employee_code, e.first_name, e.last_name, e.department,
+                    e.employee_code, e.first_name, e.last_name,
+                    COALESCE(d.department_name, e.department) AS department,
                     e.employment_type, e.employment_status
              FROM claims c
              INNER JOIN employees e ON e.id = c.employee_id
+             LEFT JOIN departments d ON d.id = e.department_id
              ' . $where . '
              ORDER BY CASE c.status
                  WHEN \'Pending Approval\' THEN 0

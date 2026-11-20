@@ -3,15 +3,7 @@ $activePage = isset($currentPage) && is_string($currentPage)
     ? $currentPage
     : (isset($_GET['page']) && is_string($_GET['page']) ? $_GET['page'] : 'dashboard');
 ?>
-<aside id="appSidebar" class="relative flex h-screen w-64 shrink-0 flex-col border-r border-gray-200 bg-white transition-[width] duration-200">
-    <div class="flex h-16 items-center gap-3 border-b border-gray-100 px-4">
-        <img src="public/assets/priority-handling-mark.png" alt="Priority Handling logo" class="h-10 w-10 shrink-0 object-contain">
-        <div class="sidebar-label min-w-0">
-            <h1 class="whitespace-nowrap text-sm font-semibold text-gray-900">Payroll & Benefits</h1>
-            <span class="whitespace-nowrap text-xs text-gray-500">Priority Handling Inc</span>
-        </div>
-    </div>
-
+<aside id="appSidebar" class="relative flex h-full w-64 shrink-0 flex-col border-r border-gray-200 bg-white transition-[width] duration-200">
     <nav class="flex-1 space-y-1 overflow-y-auto px-3 py-3" aria-label="Main navigation">
         <p class="sidebar-label mb-2 mt-1 px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Main</p>
 

@@ -98,11 +98,25 @@ preventDirectViewAccess(__FILE__);
                 
 
                 <div class="mb-9">
-                    <h1 class="text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">Welcome back.</h1>
+                    <h1 class="text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">
+                        <?= $loginMode === 'request' ? 'Reset your password.' : ($loginMode === 'verify' ? 'Check your email.' : 'Welcome back.') ?>
+                    </h1>
                     <p class="mt-4 max-w-lg text-base leading-7 text-slate-500">
-                        Sign in to continue managing your organization’s people, payroll, benefits, and claims.
+                        <?php if ($loginMode === 'request'): ?>
+                            Enter your work email and we’ll send a one-time reset code if it matches an active account.
+                        <?php elseif ($loginMode === 'verify'): ?>
+                            Enter the six-digit code and choose a new password. The code expires in 10 minutes.
+                        <?php else: ?>
+                            Sign in to continue managing your organization’s people, payroll, benefits, and claims.
+                        <?php endif; ?>
                     </p>
                 </div>
+
+                <?php if (isset($loginNotice) && is_string($loginNotice)): ?>
+                    <p role="status" class="mb-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                        <?= htmlspecialchars($loginNotice, ENT_QUOTES, 'UTF-8') ?>
+                    </p>
+                <?php endif; ?>
 
                 <?php if (isset($loginError) && is_string($loginError)): ?>
                     <p role="alert" class="mb-5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
@@ -110,7 +124,58 @@ preventDirectViewAccess(__FILE__);
                     </p>
                 <?php endif; ?>
 
-                <form method="post" action="index.php?page=login">
+                <?php if ($loginMode === 'verify'): ?>
+                    <form method="post" action="index.php?page=login">
+                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">
+                        <input type="hidden" name="action" value="complete_password_reset">
+                        <div class="space-y-5">
+                            <div>
+                                <label for="reset_code" class="mb-2.5 block text-sm font-semibold text-slate-700">Six-digit code</label>
+                                <input id="reset_code" name="reset_code" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required class="w-full rounded-xl border border-slate-200 px-4 py-4 text-sm tracking-[0.3em] shadow-sm outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50">
+                            </div>
+                            <div>
+                                <label for="new_password" class="mb-2.5 block text-sm font-semibold text-slate-700">New password</label>
+                                <input id="new_password" name="new_password" type="password" minlength="12" autocomplete="new-password" required class="w-full rounded-xl border border-slate-200 px-4 py-4 text-sm shadow-sm outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50">
+                            </div>
+                            <div>
+                                <label for="confirm_password" class="mb-2.5 block text-sm font-semibold text-slate-700">Confirm new password</label>
+                                <input id="confirm_password" name="confirm_password" type="password" minlength="12" autocomplete="new-password" required class="w-full rounded-xl border border-slate-200 px-4 py-4 text-sm shadow-sm outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-50">
+                            </div>
+                            <button type="submit" class="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-4 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100">
+                                Save new password
+                                <i class="bi bi-arrow-right text-base" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                    </form>
+
+                    <form method="post" action="index.php?page=login" class="mt-4">
+                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">
+                        <input type="hidden" name="action" value="request_password_reset">
+                        <input type="hidden" name="email" value="<?= htmlspecialchars((string) $passwordResetEmail, ENT_QUOTES, 'UTF-8') ?>">
+                        <button type="submit" class="w-full rounded-xl border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-600 transition hover:border-indigo-200 hover:text-indigo-700">
+                            Send another code
+                        </button>
+                    </form>
+                <?php elseif ($loginMode === 'request'): ?>
+                    <form method="post" action="index.php?page=login">
+                        <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'], ENT_QUOTES, 'UTF-8') ?>">
+                        <input type="hidden" name="action" value="request_password_reset">
+                        <div class="space-y-6">
+                            <div>
+                                <label for="email" class="mb-2.5 block text-sm font-semibold text-slate-700">Work email</label>
+                                <div class="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 shadow-sm transition focus-within:border-indigo-400 focus-within:ring-4 focus-within:ring-indigo-50">
+                                    <i class="bi bi-envelope h-5 w-5 shrink-0 text-slate-400" aria-hidden="true"></i>
+                                    <input id="email" name="email" type="email" autocomplete="email" placeholder="you@company.com" value="<?= htmlspecialchars((string) $passwordResetEmail, ENT_QUOTES, 'UTF-8') ?>" required class="w-full border-0 bg-transparent py-4 text-sm text-slate-900 outline-none placeholder:text-slate-400">
+                                </div>
+                            </div>
+                            <button type="submit" class="flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-4 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100">
+                                Send reset code
+                                <i class="bi bi-arrow-right text-base" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                    </form>
+                <?php else: ?>
+                    <form method="post" action="index.php?page=login">
                     <input
                         type="hidden"
                         name="csrf_token"
@@ -127,6 +192,7 @@ preventDirectViewAccess(__FILE__);
                                     type="email"
                                     autocomplete="username"
                                     placeholder="you@company.com"
+                                    value="<?= htmlspecialchars((string) $passwordResetEmail, ENT_QUOTES, 'UTF-8') ?>"
                                     required
                                     class="w-full border-0 bg-transparent py-4 text-sm text-slate-900 outline-none placeholder:text-slate-400"
                                 >
@@ -162,7 +228,16 @@ preventDirectViewAccess(__FILE__);
                     </div>
                 </form>
 
-                
+                    <a href="index.php?page=login&reset=request" class="mt-5 inline-flex text-sm font-semibold text-indigo-600 transition hover:text-indigo-700">
+                        Forgot your password?
+                    </a>
+                <?php endif; ?>
+
+                <?php if ($loginMode !== 'login'): ?>
+                    <a href="index.php?page=login&reset=login" class="mt-5 inline-flex text-sm font-semibold text-indigo-600 transition hover:text-indigo-700">
+                        Back to sign in
+                    </a>
+                <?php endif; ?>
             </div>
         </section>
     </main>
