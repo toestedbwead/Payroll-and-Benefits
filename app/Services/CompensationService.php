@@ -63,16 +63,15 @@ class CompensationService
             $version = (int) $this->connection->query(
                 'SELECT COALESCE(MAX(version), 0) + 1 FROM compensation_salary_structures'
             )->fetchColumn();
-            $statement = $this->connection->prepare(
+            $structureId = $this->insertAndGetId(
                 'INSERT INTO compensation_salary_structures (version, effective_from, created_by)
-                 VALUES (:version, :effective_from, :created_by)'
+                 VALUES (:version, :effective_from, :created_by)',
+                [
+                    'version' => $version,
+                    'effective_from' => $effectiveFrom,
+                    'created_by' => $actorId,
+                ]
             );
-            $statement->execute([
-                'version' => $version,
-                'effective_from' => $effectiveFrom,
-                'created_by' => $actorId,
-            ]);
-            $structureId = (int) $this->connection->lastInsertId();
 
             $insertGrade = $this->connection->prepare(
                 'INSERT INTO compensation_salary_grades
@@ -150,16 +149,15 @@ class CompensationService
             $version = (int) $this->connection->query(
                 'SELECT COALESCE(MAX(version), 0) + 1 FROM compensation_merit_matrices'
             )->fetchColumn();
-            $statement = $this->connection->prepare(
+            $matrixId = $this->insertAndGetId(
                 'INSERT INTO compensation_merit_matrices (version, effective_from, created_by)
-                 VALUES (:version, :effective_from, :created_by)'
+                 VALUES (:version, :effective_from, :created_by)',
+                [
+                    'version' => $version,
+                    'effective_from' => $effectiveFrom,
+                    'created_by' => $actorId,
+                ]
             );
-            $statement->execute([
-                'version' => $version,
-                'effective_from' => $effectiveFrom,
-                'created_by' => $actorId,
-            ]);
-            $matrixId = (int) $this->connection->lastInsertId();
 
             $insertBand = $this->connection->prepare(
                 'INSERT INTO compensation_merit_bands
@@ -312,7 +310,7 @@ class CompensationService
                 $this->audit($cycleId, $actorId, 'Draft cycle updated', $name);
                 $savedCycleId = $cycleId;
             } else {
-                $statement = $this->connection->prepare(
+                $savedCycleId = $this->insertAndGetId(
                     'INSERT INTO compensation_cycles
                         (cycle_name, cycle_type, effective_date, eligibility_cutoff_date,
                          minimum_performance_rating, budget_type, budget_value, total_budget,
@@ -320,22 +318,21 @@ class CompensationService
                      VALUES
                         (:cycle_name, :cycle_type, :effective_date, :cutoff_date,
                          :minimum_rating, :budget_type, :budget_value, :total_budget,
-                         :structure_id, :matrix_id, :created_by)'
+                         :structure_id, :matrix_id, :created_by)',
+                    [
+                        'cycle_name' => $name,
+                        'cycle_type' => $cycleType,
+                        'effective_date' => $effectiveDate,
+                        'cutoff_date' => $cutoffDate,
+                        'minimum_rating' => $minimumRating,
+                        'budget_type' => $budgetType,
+                        'budget_value' => $this->centsToMoney($budgetCents),
+                        'total_budget' => $this->centsToMoney($totalBudgetCents),
+                        'structure_id' => $structureId,
+                        'matrix_id' => $matrixId,
+                        'created_by' => $actorId,
+                    ]
                 );
-                $statement->execute([
-                    'cycle_name' => $name,
-                    'cycle_type' => $cycleType,
-                    'effective_date' => $effectiveDate,
-                    'cutoff_date' => $cutoffDate,
-                    'minimum_rating' => $minimumRating,
-                    'budget_type' => $budgetType,
-                    'budget_value' => $this->centsToMoney($budgetCents),
-                    'total_budget' => $this->centsToMoney($totalBudgetCents),
-                    'structure_id' => $structureId,
-                    'matrix_id' => $matrixId,
-                    'created_by' => $actorId,
-                ]);
-                $savedCycleId = (int) $this->connection->lastInsertId();
                 $this->audit($savedCycleId, $actorId, 'Draft cycle created', $name);
             }
 
@@ -1173,6 +1170,24 @@ class CompensationService
         $cycle = $statement->fetch();
 
         return $cycle === false ? null : $cycle;
+    }
+
+    private function insertAndGetId(string $query, array $parameters): int
+    {
+        $isPostgreSql = $this->connection->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql';
+        if ($isPostgreSql) {
+            $query .= ' RETURNING id';
+        }
+
+        $statement = $this->connection->prepare($query);
+        $statement->execute($parameters);
+        $id = $isPostgreSql ? $statement->fetchColumn() : $this->connection->lastInsertId();
+
+        if ($id === false || !is_numeric($id) || (int) $id < 1) {
+            throw new RuntimeException('The database did not return the inserted record ID.');
+        }
+
+        return (int) $id;
     }
 
     private function lockClause(): string

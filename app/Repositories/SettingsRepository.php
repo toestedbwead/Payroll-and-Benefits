@@ -24,9 +24,12 @@ class SettingsRepository
 
     public function save(string $key, array $value): void
     {
+        $upsert = $this->connection->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql'
+            ? 'ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)'
+            : 'ON CONFLICT (setting_key) DO UPDATE SET setting_value = EXCLUDED.setting_value';
         $statement = $this->connection->prepare(
             'INSERT INTO app_settings (setting_key, setting_value) VALUES (:setting_key, :setting_value)
-             ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value)'
+             ' . $upsert
         );
         $statement->execute([
             'setting_key' => $key,

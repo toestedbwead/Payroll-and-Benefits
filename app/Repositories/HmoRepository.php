@@ -19,6 +19,9 @@ class HmoRepository
 
     public function searchEligibleEmployees(string $searchTerm): array
     {
+        $likeOperator = $this->connection->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql'
+            ? 'ILIKE'
+            : 'LIKE';
         $statement = $this->connection->prepare(
             'SELECT e.id, e.employee_code, e.first_name, e.last_name,
                     COALESCE(d.department_name, e.department) AS department, e.job_tier
@@ -31,14 +34,14 @@ class HmoRepository
                    WHERE h.employee_id = e.id AND h.enrollment_status = \'Active\'
                )
                AND (
-                   e.employee_code LIKE :search_code
-                   OR e.first_name LIKE :search_first_name
-                   OR e.last_name LIKE :search_last_name
-                   OR CONCAT(e.first_name, \' \', e.last_name) LIKE :search_full_name
-                   OR COALESCE(d.department_name, e.department) LIKE :search_department
-               )
-             ORDER BY e.last_name, e.first_name
-             LIMIT 20'
+                   e.employee_code ' . $likeOperator . ' :search_code
+                   OR e.first_name ' . $likeOperator . ' :search_first_name
+                   OR e.last_name ' . $likeOperator . ' :search_last_name
+                   OR CONCAT(e.first_name, \' \', e.last_name) ' . $likeOperator . ' :search_full_name
+                   OR COALESCE(d.department_name, e.department) ' . $likeOperator . ' :search_department
+               )'
+             . ' ORDER BY e.last_name, e.first_name
+                 LIMIT 20'
         );
         $search = '%' . addcslashes($searchTerm, '\\%_') . '%';
         $statement->execute([
@@ -170,7 +173,7 @@ class HmoRepository
 
     public function createPlan(array $plan): int
     {
-        $statement = $this->connection->prepare(
+        return $this->insertAndGetId(
             'INSERT INTO hmo_providers (
                 provider_name, plan_tier_name, target_job_tier, max_coverage_limit,
                 room_and_board, annual_premium_cost, dependent_monthly_premium,
@@ -179,11 +182,9 @@ class HmoRepository
                 :provider_name, :plan_tier_name, :target_job_tier, :max_coverage_limit,
                 :room_and_board, :annual_premium_cost, :dependent_monthly_premium,
                 :parent_dependents_allowed, :is_active
-             )'
+             )',
+            $plan
         );
-        $statement->execute($plan);
-
-        return (int) $this->connection->lastInsertId();
     }
 
     public function updatePlan(int $planId, array $plan): void
@@ -258,28 +259,26 @@ class HmoRepository
         string $annualPremium
     ): int
     {
-        $statement = $this->connection->prepare(
+        return $this->insertAndGetId(
             'INSERT INTO employee_hmo_enrollment (
                 employee_id, hmo_provider_id, enrollment_status, effectivity_date,
                 dependent_cost_share_percent, annual_premium_cost
              ) VALUES (
                 :employee_id, :plan_id, \'Active\', :effectivity_date, :share_percent, :annual_premium
-             )'
-        );
-        $statement->execute([
+             )',
+            [
             'employee_id' => $employeeId,
             'plan_id' => $planId,
             'effectivity_date' => $effectivityDate,
             'share_percent' => $sharePercent,
             'annual_premium' => $annualPremium,
-        ]);
-
-        return (int) $this->connection->lastInsertId();
+            ]
+        );
     }
 
     public function createDependent(int $enrollmentId, array $dependent): int
     {
-        $statement = $this->connection->prepare(
+        return $this->insertAndGetId(
             'INSERT INTO hmo_dependents (
                 employee_hmo_id, dependent_name, dependent_last_name, dependent_first_name,
                 dependent_middle_initial, dependent_name_extension, dependent_age, relationship,
@@ -290,9 +289,8 @@ class HmoRepository
                 :middle_initial, :name_extension, :age, :relationship,
                 :sex, :civil_status, NULL, :birth_certificate_path,
                 :monthly_premium, :monthly_deduction
-             )'
-        );
-        $statement->execute([
+             )',
+            [
             'enrollment_id' => $enrollmentId,
             'dependent_name' => $dependent['name'],
             'last_name' => $dependent['last_name'],
@@ -306,9 +304,8 @@ class HmoRepository
             'birth_certificate_path' => $dependent['birth_certificate_path'],
             'monthly_premium' => number_format($dependent['monthly_premium'], 2, '.', ''),
             'monthly_deduction' => number_format($dependent['monthly_premium'], 2, '.', ''),
-        ]);
-
-        return (int) $this->connection->lastInsertId();
+            ]
+        );
     }
 
     public function findEnrollmentForUpdate(int $enrollmentId): ?array
@@ -410,11 +407,14 @@ class HmoRepository
 
     public function voidQueuedDependentDeductions(int $dependentId): int
     {
+        $monthStart = $this->connection->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql'
+            ? "date_trunc('month', CURRENT_DATE)::date"
+            : "DATE_FORMAT(CURDATE(), '%Y-%m-01')";
         $statement = $this->connection->prepare(
             'UPDATE hmo_payroll_deductions
              SET status = \'Voided\'
              WHERE dependent_id = :dependent_id
-               AND payroll_month >= DATE_FORMAT(CURDATE(), \'%Y-%m-01\')
+               AND payroll_month >= ' . $monthStart . '
                AND status = \'Queued\''
         );
         $statement->execute(['dependent_id' => $dependentId]);
@@ -459,11 +459,14 @@ class HmoRepository
 
     public function voidFutureDeductions(int $enrollmentId, string $terminationDate): int
     {
+        $monthStart = $this->connection->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql'
+            ? "date_trunc('month', CAST(:termination_date AS date))::date"
+            : "DATE_FORMAT(:termination_date, '%Y-%m-01')";
         $statement = $this->connection->prepare(
             'UPDATE hmo_payroll_deductions
              SET status = \'Voided\'
              WHERE employee_hmo_id = :enrollment_id
-               AND payroll_month > DATE_FORMAT(:termination_date, \'%Y-%m-01\')
+               AND payroll_month > ' . $monthStart . '
                AND status = \'Queued\''
         );
         $statement->execute([
@@ -495,12 +498,13 @@ class HmoRepository
 
     public function queueDeduction(string $month, array $deduction): bool
     {
-        $statement = $this->connection->prepare(
-            'INSERT INTO hmo_payroll_deductions (
+        $query = 'INSERT INTO hmo_payroll_deductions (
                 employee_hmo_id, dependent_id, payroll_month, amount, status
-             ) VALUES (:enrollment_id, :dependent_id, :payroll_month, :amount, \'Queued\')'
-             . ' ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)'
-        );
+             ) VALUES (:enrollment_id, :dependent_id, :payroll_month, :amount, \'Queued\')';
+        $query .= $this->connection->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql'
+            ? ' ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id)'
+            : ' ON CONFLICT (dependent_id, payroll_month) DO NOTHING';
+        $statement = $this->connection->prepare($query);
         $statement->execute([
             'enrollment_id' => $deduction['employee_hmo_id'],
             'dependent_id' => $deduction['dependent_id'],
@@ -509,6 +513,24 @@ class HmoRepository
         ]);
 
         return $statement->rowCount() === 1;
+    }
+
+    private function insertAndGetId(string $query, array $parameters): int
+    {
+        $isPostgreSql = $this->connection->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql';
+        if ($isPostgreSql) {
+            $query .= ' RETURNING id';
+        }
+
+        $statement = $this->connection->prepare($query);
+        $statement->execute($parameters);
+        $id = $isPostgreSql ? $statement->fetchColumn() : $this->connection->lastInsertId();
+
+        if ($id === false || !is_numeric($id) || (int) $id < 1) {
+            throw new RuntimeException('The database did not return the inserted record ID.');
+        }
+
+        return (int) $id;
     }
 
     public function updateDeductionStatuses(string $month, string $from, string $to): int

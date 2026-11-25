@@ -24,6 +24,8 @@ class PasswordResetService
         $secret = $this->hashSecret();
         $code = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
         $codeHash = hash_hmac('sha256', $code, $secret);
+        $isPostgreSql = $this->connection->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql';
+        $utcNow = $isPostgreSql ? "(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')" : 'UTC_TIMESTAMP()';
         $this->connection->beginTransaction();
         try {
             $lockUser = $this->connection->prepare(
@@ -35,8 +37,11 @@ class PasswordResetService
                 return false;
             }
 
+            $elapsedSeconds = $isPostgreSql
+                ? 'EXTRACT(EPOCH FROM (' . $utcNow . ' - requested_at))'
+                : 'TIMESTAMPDIFF(SECOND, requested_at, UTC_TIMESTAMP())';
             $lastRequest = $this->connection->prepare(
-                'SELECT TIMESTAMPDIFF(SECOND, requested_at, UTC_TIMESTAMP())
+                'SELECT ' . $elapsedSeconds . '
                  FROM password_reset_codes WHERE user_id = :user_id FOR UPDATE'
             );
             $lastRequest->execute(['user_id' => $user['id']]);
@@ -46,16 +51,26 @@ class PasswordResetService
                 return false;
             }
 
+            $expiresAt = $isPostgreSql
+                ? '(' . $utcNow . ' + INTERVAL \'10 minutes\')'
+                : 'DATE_ADD(UTC_TIMESTAMP(), INTERVAL 10 MINUTE)';
+            $upsert = $isPostgreSql
+                ? 'ON CONFLICT (user_id) DO UPDATE SET
+                    code_hash = EXCLUDED.code_hash,
+                    expires_at = EXCLUDED.expires_at,
+                    attempts = 0,
+                    requested_at = EXCLUDED.requested_at'
+                : 'ON DUPLICATE KEY UPDATE
+                    code_hash = VALUES(code_hash),
+                    expires_at = VALUES(expires_at),
+                    attempts = 0,
+                    requested_at = VALUES(requested_at)';
             $saveCode = $this->connection->prepare(
                 'INSERT INTO password_reset_codes
                     (user_id, code_hash, expires_at, attempts, requested_at)
                  VALUES
-                    (:user_id, :code_hash, DATE_ADD(UTC_TIMESTAMP(), INTERVAL 10 MINUTE), 0, UTC_TIMESTAMP())
-                 ON DUPLICATE KEY UPDATE
-                    code_hash = VALUES(code_hash),
-                    expires_at = VALUES(expires_at),
-                    attempts = 0,
-                    requested_at = VALUES(requested_at)'
+                    (:user_id, :code_hash, ' . $expiresAt . ', 0, ' . $utcNow . ')
+                 ' . $upsert
             );
             $saveCode->execute([
                 'user_id' => $user['id'],
@@ -75,7 +90,7 @@ class PasswordResetService
             try {
                 $invalidateCode = $this->connection->prepare(
                     'UPDATE password_reset_codes
-                     SET attempts = 5, expires_at = UTC_TIMESTAMP()
+                     SET attempts = 5, expires_at = ' . $utcNow . '
                      WHERE user_id = :user_id AND code_hash = :code_hash'
                 );
                 $invalidateCode->execute([
@@ -98,11 +113,16 @@ class PasswordResetService
         }
 
         $secret = $this->hashSecret();
+        $isPostgreSql = $this->connection->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql';
+        $utcNow = $isPostgreSql ? "(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')" : 'UTC_TIMESTAMP()';
+        $unexpired = $isPostgreSql
+            ? 'CASE WHEN prc.expires_at > ' . $utcNow . ' THEN 1 ELSE 0 END'
+            : '(prc.expires_at > UTC_TIMESTAMP())';
         $this->connection->beginTransaction();
         try {
             $statement = $this->connection->prepare(
                 'SELECT prc.user_id, prc.code_hash, prc.attempts,
-                        (prc.expires_at > UTC_TIMESTAMP()) AS unexpired
+                        ' . $unexpired . ' AS unexpired
                  FROM password_reset_codes prc
                  INNER JOIN users u ON u.id = prc.user_id
                  WHERE u.email = :email AND u.is_active = 1

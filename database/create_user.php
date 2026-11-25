@@ -37,7 +37,21 @@ require_once __DIR__ . '/../config/database.php';
 try {
     $connection = getDatabaseConnection();
     if ($role === 'manager') {
-        $column = $connection->query("SHOW COLUMNS FROM users LIKE 'employee_id'")->fetch();
+        if ($connection->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql') {
+            $columnStatement = $connection->prepare(
+                'SELECT 1 FROM information_schema.columns
+                 WHERE table_schema = current_schema()
+                   AND table_name = :table_name
+                   AND column_name = :column_name'
+            );
+            $columnStatement->execute([
+                'table_name' => 'users',
+                'column_name' => 'employee_id',
+            ]);
+            $column = $columnStatement->fetch();
+        } else {
+            $column = $connection->query("SHOW COLUMNS FROM users LIKE 'employee_id'")->fetch();
+        }
         if ($column === false) {
             throw new RuntimeException('Apply database/008_compensation_workflow_migration.sql before creating a manager login.');
         }

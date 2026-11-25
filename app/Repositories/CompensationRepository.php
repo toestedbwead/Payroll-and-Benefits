@@ -161,10 +161,13 @@ class CompensationRepository
 
     public function hasWorkflowSchema(): bool
     {
+        $schemaFilter = $this->connection->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql'
+            ? 'table_schema = current_schema()'
+            : 'TABLE_SCHEMA = DATABASE()';
         $columns = $this->connection->query(
             'SELECT COUNT(*)
              FROM information_schema.COLUMNS
-             WHERE TABLE_SCHEMA = DATABASE()
+             WHERE ' . $schemaFilter . '
                AND ((TABLE_NAME = \'users\' AND COLUMN_NAME = \'employee_id\')
                  OR (TABLE_NAME = \'employees\' AND COLUMN_NAME IN (\'salary_grade_code\', \'department_id\'))
                  OR (TABLE_NAME = \'compensation_department_budgets\' AND COLUMN_NAME = \'department_id\')
@@ -177,7 +180,7 @@ class CompensationRepository
         $tables = $this->connection->query(
             'SELECT COUNT(*)
              FROM information_schema.TABLES
-             WHERE TABLE_SCHEMA = DATABASE()
+             WHERE ' . $schemaFilter . '
                AND TABLE_NAME IN (\'compensation_recommendations\', \'compensation_exclusions\', \'departments\')'
         );
 

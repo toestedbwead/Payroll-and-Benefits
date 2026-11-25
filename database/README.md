@@ -16,7 +16,7 @@
    - [ ] `009_department_migration.sql` — after 008; creates and backfills normalized departments and adds department IDs while retaining department-name snapshots.
    - [ ] `010_password_reset_codes_migration.sql` — adds storage for expiring, single-use password reset codes.
 
-5. The project reads database settings from the root `.env` file. It is initialized with the local defaults `127.0.0.1:3307`, database `payroll_db`, user `root`, and an empty password. Edit `.env` if your local MySQL credentials differ. Keep `.env` private; `.env.example` is safe to share.
+5. The project reads database settings from the root `.env` file. It defaults to local MySQL at `127.0.0.1:3307`, database `payroll_db`, user `root`, and an empty password. To use the Supabase PostgreSQL migration, set `PAYROLL_DB_DRIVER=pgsql` and fill `PAYROLL_DB_HOST`, `PAYROLL_DB_PORT`, `PAYROLL_DB_NAME`, `PAYROLL_DB_USER`, `PAYROLL_DB_PASSWORD`, and `PAYROLL_DB_SSLMODE` using the project's **Connect → Session pooler** settings. Enable PHP's `pdo_pgsql` extension in both local XAMPP and the production host. The password and `.env` must remain private; do not use the publishable/anon key as the database password.
    Password reset email uses SMTP with STARTTLS. Configure `EMAIL_SMTP_HOST`, `EMAIL_SMTP_PORT`, `EMAIL_SMTP_USER`, `EMAIL_SMTP_APP_PASSWORD`, and `EMAIL_FROM_ADDRESS`; set `EMAIL_OTP_HASH_SECRET` to a private random value of at least 32 characters. Generate one with `php -r "echo bin2hex(random_bytes(32)), PHP_EOL;"`.
 6. From the project root, create the first sign-in account:
 

@@ -62,10 +62,13 @@ class ClaimsRepository
         }
 
         if ($search !== '') {
-            $conditions[] = '(e.employee_code LIKE :search_code
-                OR e.first_name LIKE :search_first
-                OR e.last_name LIKE :search_last
-                OR CONCAT(e.first_name, \' \', e.last_name) LIKE :search_name)';
+            $likeOperator = $this->connection->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql'
+                ? 'ILIKE'
+                : 'LIKE';
+            $conditions[] = '(e.employee_code ' . $likeOperator . ' :search_code
+                OR e.first_name ' . $likeOperator . ' :search_first
+                OR e.last_name ' . $likeOperator . ' :search_last
+                OR CONCAT(e.first_name, \' \', e.last_name) ' . $likeOperator . ' :search_name)';
             $pattern = '%' . $search . '%';
             $parameters['search_code'] = $pattern;
             $parameters['search_first'] = $pattern;
